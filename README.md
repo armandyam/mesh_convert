@@ -17,3 +17,6 @@ This series will show a `quality` field on triangles.
 To see edge lengths, open `adapting/edges/steps.pvd`
 in Paraview and look at the `length` field on
 "cells" (edges in this series).
+
+All these files should have a `metric` field on
+vertices as well.
