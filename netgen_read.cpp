@@ -18,7 +18,8 @@ int main(int argc, char* argv[])
   int nv;
 
   //opening netgen mesh file
-  inmesh.open("netgen.vol",ios::in);
+  OMEGA_H_CHECK(argc == 2);
+  inmesh.open(argv[1], ios::in);
   while(true)
   {
     getline(inmesh,line);
