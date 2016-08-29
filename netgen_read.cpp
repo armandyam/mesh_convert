@@ -150,19 +150,22 @@ int main(int argc, char* argv[])
    */
   auto v2ve = v2e.a2ab;
   auto ve2e = v2e.ab2b;
+  /* for each vertex (i) */
   for (i = 0; i < mesh.nverts(); ++i) {
-    Omega_h::I8 vcd = 2;
+    Omega_h::I8 vcd = 2; /* initialize dimension to 2D */
     Omega_h::I32 vci = -1;
+    /* for each edge touch (ve) */
     for (auto ve = v2ve[i]; ve < v2ve[i + 1]; ++ve) {
-      auto e = ve2e[ve];
-      auto ecd = edge_class_dim[e];
-      if (ecd == 2) continue;
-      auto eci = edge_class_id[e];
-      if (vcd == 2) {
+      auto e = ve2e[ve]; /* get the touching edge */
+      auto ecd = edge_class_dim[e]; /* its classification */
+      if (ecd == 2) continue; /* interior edge */
+      auto eci = edge_class_id[e]; /* class_id of edge */
+      if (vcd == 2) { /* though vertex was interior, but it touches boundary */
         vcd = 1;
         vci = eci;
         continue;
       }
+      /* touches two geometric edges: geometric vertex */
       if (vcd == 1 && eci != vci) {
         vcd = 0;
         vci = i + 1;
