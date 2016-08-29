@@ -223,4 +223,22 @@ int main(int argc, char* argv[])
 
   /* write the converted mesh to VTK file */
   Omega_h::vtk::write_vtu(argv[2], &mesh, 2);
+
+  /* Find the "identity" metric: the one that keeps the mesh the same */
+  auto id_metric = find_identity_metric(&mesh);
+  mesh.add_tag(Omega_h::VERT, "metric", 3, OMEGA_H_METRIC,
+      OMEGA_H_DO_OUTPUT, id_metric);
+/* Adapt the mesh ! */
+  Omega_h::vtk::FullWriter writer(&mesh, "adapting");
+  /* move metric closer to target until element quality below 30%: */
+  while (approach_metric(&mesh, 0.30)) {
+    adapt(&mesh,
+        0.30, /* min allowable quality during adapt */
+        0.40, /* desired min quality */
+        1.0 / 2.0, /* desired min metric length */
+        1.0 / 1.0, /* desired max metric length */
+        4, /* number of sliver layers */
+        3); /* verbosity level */
+    writer.write(); /* output VTK file */
+  }
 }
