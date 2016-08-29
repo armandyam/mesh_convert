@@ -20,7 +20,7 @@ int main(int argc, char* argv[])
   auto lib = Omega_h::Library(&argc, &argv);
 
   //opening netgen mesh file
-  OMEGA_H_CHECK(argc == 3);
+  OMEGA_H_CHECK(argc == 4);
   inmesh.open(argv[1], ios::in);
   while(true)
   {
@@ -181,4 +181,30 @@ int main(int argc, char* argv[])
 /* end classification work */
   /* write the converted mesh to VTK file */
   Omega_h::vtk::write_vtu(argv[2], &mesh, 2);
+
+  /* reading in the anisotropy data*/
+  fstream inmetric;
+  inmetric.open(argv[3], ios::in);
+  int nv_metric, dim;
+  inmetric >> nv_metric >> dim;
+  /* Check to make sure the number of data poitns in the anisotropy informaiton is the same as the number of nodes*/
+  if(nv_metric!=nv || dim!=3)
+  {
+    cout<<"Metric data does not correspond to the given mesh!"<<endl;
+    exit(1);
+  }
+  i = 0;
+  /* The anisotropy variables are as follows:
+  * aa corresponds to XX
+  * bb corresponds to XY
+  * cc corresponds to YY
+  */
+  double aa[nv_metric], bb[nv_metric], cc[nv_metric];
+  while(i<nv_metric)
+  {
+    inmetric >> aa[i] >> bb[i] >> cc[i];
+    i++;
+  }
+  /* Anisotropy information read from file */
+
 }
