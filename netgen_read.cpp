@@ -84,17 +84,101 @@ int main(int argc, char* argv[])
   }
   inmesh.close();
 
-  Omega_h::Write<Omega_h::LO> ev2v_w(mtris * 3);
+  /* copy triangle connectivity */
+  Omega_h::Write<Omega_h::LO> tv2v_w(mtris * 3);
   for (i = 0; i < mtris; ++i)
     for (j = 0; j < 3; ++j)
-      ev2v_w[i * 3 + j] = tripoints[i][j] - 1;
-  auto ev2v = Omega_h::LOs(ev2v_w);
+      tv2v_w[i * 3 + j] = tripoints[i][j] - 1;
+  auto tv2v = Omega_h::LOs(tv2v_w);
+  /* copy vertex coordinates */
   Omega_h::Write<Omega_h::Real> coords_w(nvmax * 2);
   for (i = 0; i < nvmax; ++i)
     for (j = 0; j < 2; ++j)
       coords_w[i * 2 + j] = mpoints[i][j];
   auto coords = Omega_h::Reals(coords_w);
+  /* build the basic mesh from triangle connectivity and coordinates */
   Omega_h::Mesh mesh;
-  Omega_h::build_from_elems_and_coords(&mesh, lib, 2, ev2v, coords);
+  Omega_h::build_from_elems_and_coords(&mesh, lib, 2, tv2v, coords);
+/* begin classification work */
+  /* do a simple classification of triangles: all to interior #1 */
+  mesh.add_tag(Omega_h::TRI, "class_dim", 1, OMEGA_H_INHERIT,
+      OMEGA_H_DO_OUTPUT, Omega_h::Read<Omega_h::I8>(mesh.ntris(), 2));
+  mesh.add_tag(Omega_h::TRI, "class_id", 1, OMEGA_H_INHERIT,
+      OMEGA_H_DO_OUTPUT, Omega_h::Read<Omega_h::I32>(mesh.ntris(), 1));
+  /* Omega_h constructs all edges internally. here we find matches
+   * between those internally constructed edges and those specified
+   * in "edgesegmentsgi2".
+   * we assume ednr1=ednr2 and that this is the main indicator
+   * of what boundary something is on.
+   */
+  /* copy "edgesegmentsgi2" connectivity */
+  Omega_h::Write<Omega_h::LO> ev2v_w(medges * 2);
+  for (i = 0; i < medges; ++i)
+    for (j = 0; j < 2; ++j)
+      ev2v_w[i * 2 + j] = epoints[i][j] - 1;
+  auto ev2v = Omega_h::LOs(ev2v_w);
+  /* use the Omega_h match finding function */
+  auto v2e = mesh.ask_up(Omega_h::VERT, Omega_h::EDGE);
+  Omega_h::LOs e2e;
+  Omega_h::Read<Omega_h::I8> e2e_codes;
+  Omega_h::find_matches(1, ev2v, mesh.ask_verts_of(Omega_h::EDGE), v2e,
+      &e2e, &e2e_codes);
+  /* initialize edge dimensions to 2D interior #1 */
+  Omega_h::Write<Omega_h::I8> edge_class_dim_w(mesh.nedges(), 2);
+  Omega_h::Write<Omega_h::I32> edge_class_id_w(mesh.nedges(), 1);
+  /* edges that matched "edgesegmentsgi2" are set to 1D, i.e. boundary,
+   * and their class_id is their ednr */
+  for (i = 0; i < medges; ++i) {
+    auto edge = e2e[i];
+    edge_class_dim_w[edge] = 1;
+    edge_class_id_w[edge] = ednr1[i];
+  }
+  Omega_h::Read<Omega_h::I8> edge_class_dim(edge_class_dim_w);
+  Omega_h::Read<Omega_h::I32> edge_class_id(edge_class_id_w);
+  /* set edge classification */
+  mesh.add_tag(Omega_h::EDGE, "class_dim", 1, OMEGA_H_INHERIT,
+      OMEGA_H_DO_OUTPUT, edge_class_dim);
+  mesh.add_tag(Omega_h::EDGE, "class_id", 1, OMEGA_H_INHERIT,
+      OMEGA_H_DO_OUTPUT, edge_class_id);
+  Omega_h::Write<Omega_h::I8> vert_class_dim_w(mesh.nverts());
+  Omega_h::Write<Omega_h::I32> vert_class_id_w(mesh.nverts());
+  /* classify vertices: if it touches boundary edges with all the
+   * same ednr, then it is 1D and has that ednr.
+   * if it touches two ednrs, then it is a corner, class_dim is 0D,
+   * and class_id will be the vertex id, because the initial mesh generator
+   * creates corner points first.
+   */
+  auto v2ve = v2e.a2ab;
+  auto ve2e = v2e.ab2b;
+  for (i = 0; i < mesh.nverts(); ++i) {
+    Omega_h::I8 vcd = 2;
+    Omega_h::I32 vci = -1;
+    for (auto ve = v2ve[i]; ve < v2ve[i + 1]; ++ve) {
+      auto e = ve2e[ve];
+      auto ecd = edge_class_dim[e];
+      if (ecd == 2) continue;
+      auto eci = edge_class_id[e];
+      if (vcd == 2) {
+        vcd = 1;
+        vci = eci;
+        continue;
+      }
+      if (vcd == 1 && eci != vci) {
+        vcd = 0;
+        vci = i + 1;
+      }
+    }
+    vert_class_dim_w[i] = vcd;
+    vert_class_id_w[i] = vci;
+  }
+  Omega_h::Read<Omega_h::I8> vert_class_dim(vert_class_dim_w);
+  Omega_h::Read<Omega_h::I32> vert_class_id(vert_class_id_w);
+  /* set vertex classification */
+  mesh.add_tag(Omega_h::VERT, "class_dim", 1, OMEGA_H_INHERIT,
+      OMEGA_H_DO_OUTPUT, vert_class_dim);
+  mesh.add_tag(Omega_h::VERT, "class_id", 1, OMEGA_H_INHERIT,
+      OMEGA_H_DO_OUTPUT, vert_class_id);
+/* end classification work */
+  /* write the converted mesh to VTK file */
   Omega_h::vtk::write_vtu(argv[2], &mesh, 2);
 }
