@@ -4,8 +4,9 @@
 #include<vector>
 #include<math.h>
 #include<assert.h>
-#include "omega_h.hpp"
-#include "omega_h_math.hpp"
+
+#include "Omega_h.hpp"
+#include "Omega_h_math.hpp"
 
 using namespace std;
 int main(int argc, char* argv[])
