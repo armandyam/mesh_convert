@@ -17,8 +17,10 @@ int main(int argc, char* argv[])
   fstream inmesh, outmesh;
   int nv;
 
+  auto lib = Omega_h::Library(&argc, &argv);
+
   //opening netgen mesh file
-  OMEGA_H_CHECK(argc == 2);
+  OMEGA_H_CHECK(argc == 3);
   inmesh.open(argv[1], ios::in);
   while(true)
   {
@@ -81,4 +83,18 @@ int main(int argc, char* argv[])
     i++;
   }
   inmesh.close();
+
+  Omega_h::Write<Omega_h::LO> ev2v_w(mtris * 3);
+  for (i = 0; i < mtris; ++i)
+    for (j = 0; j < 3; ++j)
+      ev2v_w[i * 3 + j] = tripoints[i][j] - 1;
+  auto ev2v = Omega_h::LOs(ev2v_w);
+  Omega_h::Write<Omega_h::Real> coords_w(nvmax * 2);
+  for (i = 0; i < nvmax; ++i)
+    for (j = 0; j < 2; ++j)
+      coords_w[i * 2 + j] = mpoints[i][j];
+  auto coords = Omega_h::Reals(coords_w);
+  Omega_h::Mesh mesh;
+  Omega_h::build_from_elems_and_coords(&mesh, lib, 2, ev2v, coords);
+  Omega_h::vtk::write_vtu(argv[2], &mesh, 2);
 }
