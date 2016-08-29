@@ -91,8 +91,8 @@ int main(int argc, char* argv[])
       tv2v_w[i * 3 + j] = tripoints[i][j] - 1;
   auto tv2v = Omega_h::LOs(tv2v_w);
   /* copy vertex coordinates */
-  Omega_h::Write<Omega_h::Real> coords_w(nvmax * 2);
-  for (i = 0; i < nvmax; ++i)
+  Omega_h::Write<Omega_h::Real> coords_w(nv * 2);
+  for (i = 0; i < nv; ++i)
     for (j = 0; j < 2; ++j)
       coords_w[i * 2 + j] = mpoints[i][j];
   auto coords = Omega_h::Reals(coords_w);
@@ -182,8 +182,6 @@ int main(int argc, char* argv[])
   mesh.add_tag(Omega_h::VERT, "class_id", 1, OMEGA_H_INHERIT,
       OMEGA_H_DO_OUTPUT, vert_class_id);
 /* end classification work */
-  /* write the converted mesh to VTK file */
-  Omega_h::vtk::write_vtu(argv[2], &mesh, 2);
 
   /* reading in the anisotropy data*/
   fstream inmetric;
@@ -210,4 +208,19 @@ int main(int argc, char* argv[])
   }
   /* Anisotropy information read from file */
 
+  /* attach the metric to the Omega_h mesh, as "target_metric" */
+  Omega_h::Write<Omega_h::Real> metric_w(nv * 3);
+  for (i = 0; i < nv; ++i) {
+    Omega_h::Matrix<2, 2> m;
+    m[0][0] = aa[i];
+    m[0][1] = m[1][0] = bb[i];
+    m[1][1] = cc[i];
+    Omega_h::set_symm(metric_w, i, m);
+  }
+  Omega_h::Reals metric(metric_w);
+  mesh.add_tag(Omega_h::VERT, "target_metric", 3, OMEGA_H_METRIC,
+      OMEGA_H_DO_OUTPUT, metric);
+
+  /* write the converted mesh to VTK file */
+  Omega_h::vtk::write_vtu(argv[2], &mesh, 2);
 }
