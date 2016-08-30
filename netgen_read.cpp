@@ -11,7 +11,6 @@
 using namespace std;
 int main(int argc, char* argv[])
 {
-  int i,j;
   double dummy;
   string line;
   fstream inmesh, outmesh;
@@ -32,13 +31,10 @@ int main(int argc, char* argv[])
 
   int tripoints[mtris][3];
   nvmax=1;
-  i = 0;
-  while (i < mtris)
+  for (int i = 0; i < mtris; ++i)
   {
     inmesh >> dummy >> dummy >> dummy >> dummy >> dummy >> tripoints[i][0] >> tripoints[i][1] >> tripoints[i][2];
     nvmax=max(max(tripoints[i][0], tripoints[i][1]), max(tripoints[i][2],nvmax));
-
-    i++;
   }
 
   while(true)
@@ -50,13 +46,9 @@ int main(int argc, char* argv[])
   inmesh >> medges;
   int epoints[medges][2], ednr1[medges], ednr2[medges], surfid[medges];
   double dist1[medges], dist2[medges];
-  {
-    i=0;
-  }
-  while (i < medges)
+  for (int i = 0; i < medges; ++i)
   {
     inmesh >> surfid[i] >> dummy >> epoints[i][0] >> epoints[i][1] >> dummy >> dummy >> dummy >> dummy >> ednr1[i] >> dist1[i] >> ednr2[i] >> dist2[i];
-    i++;
   }
 
   while(true)
@@ -66,24 +58,22 @@ int main(int argc, char* argv[])
   }
   inmesh >> nv;
   double mpoints[nv][2];
-  i=0;
-  while(i < nv)
+  for (int i = 0; i < nv; ++i)
   {
     inmesh >> mpoints[i][0] >> mpoints[i][1] >> dummy;
-    i++;
   }
   inmesh.close();
 
   /* copy triangle connectivity */
   Omega_h::Write<Omega_h::LO> tv2v_w(mtris * 3);
-  for (i = 0; i < mtris; ++i)
-    for (j = 0; j < 3; ++j)
+  for (int i = 0; i < mtris; ++i)
+    for (int j = 0; j < 3; ++j)
       tv2v_w[i * 3 + j] = tripoints[i][j] - 1;
   auto tv2v = Omega_h::LOs(tv2v_w);
   /* copy vertex coordinates */
   Omega_h::Write<Omega_h::Real> coords_w(nv * 2);
-  for (i = 0; i < nv; ++i)
-    for (j = 0; j < 2; ++j)
+  for (int i = 0; i < nv; ++i)
+    for (int j = 0; j < 2; ++j)
       coords_w[i * 2 + j] = mpoints[i][j];
   auto coords = Omega_h::Reals(coords_w);
   /* build the basic mesh from triangle connectivity and coordinates */
@@ -103,8 +93,8 @@ int main(int argc, char* argv[])
    */
   /* copy "edgesegmentsgi2" connectivity */
   Omega_h::Write<Omega_h::LO> ev2v_w(medges * 2);
-  for (i = 0; i < medges; ++i)
-    for (j = 0; j < 2; ++j)
+  for (int i = 0; i < medges; ++i)
+    for (int j = 0; j < 2; ++j)
       ev2v_w[i * 2 + j] = epoints[i][j] - 1;
   auto ev2v = Omega_h::LOs(ev2v_w);
   /* use the Omega_h match finding function */
@@ -118,7 +108,7 @@ int main(int argc, char* argv[])
   Omega_h::Write<Omega_h::I32> edge_class_id_w(mesh.nedges(), 1);
   /* edges that matched "edgesegmentsgi2" are set to 1D, i.e. boundary,
    * and their class_id is their ednr */
-  for (i = 0; i < medges; ++i) {
+  for (int i = 0; i < medges; ++i) {
     auto edge = e2e[i];
     edge_class_dim_w[edge] = 1;
     edge_class_id_w[edge] = ednr1[i];
@@ -141,7 +131,7 @@ int main(int argc, char* argv[])
   auto v2ve = v2e.a2ab;
   auto ve2e = v2e.ab2b;
   /* for each vertex (i) */
-  for (i = 0; i < mesh.nverts(); ++i) {
+  for (int i = 0; i < mesh.nverts(); ++i) {
     Omega_h::I8 vcd = 2; /* initialize dimension to 2D */
     Omega_h::I32 vci = -1;
     /* for each edge touch (ve) */
@@ -184,23 +174,21 @@ int main(int argc, char* argv[])
     cout<<"Metric data does not correspond to the given mesh!"<<endl;
     exit(1);
   }
-  i = 0;
   /* The anisotropy variables are as follows:
   * aa corresponds to XX
   * bb corresponds to XY
   * cc corresponds to YY
   */
   double aa[nv_metric], bb[nv_metric], cc[nv_metric];
-  while(i<nv_metric)
+  for (int i = 0; i < nv_metric; ++i)
   {
     inmetric >> aa[i] >> bb[i] >> cc[i];
-    i++;
   }
   /* Anisotropy information read from file */
 
   /* attach the metric to the Omega_h mesh, as "target_metric" */
   Omega_h::Write<Omega_h::Real> metric_w(nv * 3);
-  for (i = 0; i < nv; ++i) {
+  for (int i = 0; i < nv; ++i) {
     Omega_h::Matrix<2, 2> m;
     m[0][0] = aa[i];
     m[0][1] = m[1][0] = bb[i];
