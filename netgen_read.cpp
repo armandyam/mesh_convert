@@ -198,22 +198,62 @@ void read_and_attach_metric(Omega_h::Mesh* mesh, const char* metric_filename)
       OMEGA_H_DO_OUTPUT, metric);
 }
 
+/* derive dist based on ednr !
+ * This only works for the square model !
+ */
+double derive_dist(int ednr, Omega_h::Vector<2> x) {
+  switch(ednr) {
+    case 1: return x[0];
+    case 2: return x[1];
+    case 3: return 1.0 - x[0];
+    case 4: return 1.0 - x[1];
+  }
+  Omega_h_fail("unknown ednr!");
+}
+
 void write_vol_mesh(Omega_h::Mesh* mesh, const char* vol_filename) {
   std::ofstream file(vol_filename);
   file << "mesh3d\ndimension\n2\ngeomtype\n0\n\n";
   file << "# surfnr    bcnr   domin  domout      np      p1      p2      p3\n";
   file << "surfaceelements\n" << mesh->nelems() << '\n';
-  auto oldwidth = file.width();
-  file.width(8);
   auto tv2v = mesh->ask_verts_of(Omega_h::TRI);
   auto w8 = std::setw(8);
+  auto w12 = std::setw(12);
   for (int i = 0; i < mesh->ntris(); ++i) {
     file << w8 << 2 << w8 << 1 << w8 << 0 << w8 << 0 << w8 << 3;
     for (int j = 0; j < 3; ++j)
-      file << w8 << tv2v[i * 3 + j];
+      file << w8 << tv2v[i * 3 + j] + 1;
     file << '\n';
   }
-  file.width(oldwidth);
+  file << "\n\n#  matnr      np      p1      p2      p3      p4\n";
+  file << "volumeelements\n0\n\n\n";
+  auto ev2v = mesh->ask_verts_of(Omega_h::EDGE);
+  auto e_class_dim = mesh->get_array<Omega_h::I8>(Omega_h::EDGE, "class_dim");
+  auto e_class_id = mesh->get_array<Omega_h::I32>(Omega_h::EDGE, "class_id");
+  auto coords = mesh->coords();
+  int nsurfe = 0;
+  for (int i = 0; i < mesh->nedges(); ++i)
+    if (e_class_dim[i] == 1)
+      nsurfe++;
+  file << "# surfid       0      p1      p2";
+  file << "    tri1    tri2 surfnr1 surfnr2";
+  file << "   ednr1       dist1   ednr2       dist2\n";
+  file << nsurfe << '\n';
+  for (int i = 0; i < mesh->nedges(); ++i) {
+    if (e_class_dim[i] != 1) continue;
+    file << w8 << 1 << w8 << 0;
+    for (int j = 0; j < 2; ++j)
+      file << w8 << ev2v[i * 2 + j] + 1;
+    file << w8 << -1 << w8 << -1 << w8 << 1 << w8 << 0;
+    auto ednr = e_class_id[i];
+    for (int j = 0; j < 2; ++j) {
+      auto vert = ev2v[i * 2 + j];
+      auto x = Omega_h::get_vector<2>(coords, vert);
+      auto dist = derive_dist(ednr, x);
+      file << w8 << ednr << w12 << dist;
+    }
+    file << '\n';
+  }
 }
 
 int main(int argc, char* argv[])
