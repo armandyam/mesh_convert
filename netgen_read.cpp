@@ -8,33 +8,30 @@
 #include "Omega_h.hpp"
 #include "Omega_h_math.hpp"
 
-using namespace std;
 int main(int argc, char* argv[])
 {
   double dummy;
-  string line;
-  fstream inmesh, outmesh;
+  std::string line;
+  std::fstream inmesh;
   int nv;
 
   auto lib = Omega_h::Library(&argc, &argv);
 
   //opening netgen mesh file
   OMEGA_H_CHECK(argc == 4);
-  inmesh.open(argv[1], ios::in);
+  inmesh.open(argv[1], std::ios::in);
   while(true)
   {
     getline(inmesh,line);
     if (line == "surfaceelements") break;
   }
-  int mtris, nvmax;
+  int mtris;
   inmesh >> mtris;
 
   int tripoints[mtris][3];
-  nvmax=1;
   for (int i = 0; i < mtris; ++i)
   {
     inmesh >> dummy >> dummy >> dummy >> dummy >> dummy >> tripoints[i][0] >> tripoints[i][1] >> tripoints[i][2];
-    nvmax=max(max(tripoints[i][0], tripoints[i][1]), max(tripoints[i][2],nvmax));
   }
 
   while(true)
@@ -164,14 +161,14 @@ int main(int argc, char* argv[])
 /* end classification work */
 
   /* reading in the anisotropy data*/
-  fstream inmetric;
-  inmetric.open(argv[3], ios::in);
+  std::fstream inmetric;
+  inmetric.open(argv[3], std::ios::in);
   int nv_metric, dim;
   inmetric >> nv_metric >> dim;
   /* Check to make sure the number of data poitns in the anisotropy informaiton is the same as the number of nodes*/
   if(nv_metric!=nv || dim!=3)
   {
-    cout<<"Metric data does not correspond to the given mesh!"<<endl;
+    std::cout<<"Metric data does not correspond to the given mesh!"<<std::endl;
     exit(1);
   }
   /* The anisotropy variables are as follows:
