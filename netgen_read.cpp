@@ -8,18 +8,14 @@
 #include "Omega_h.hpp"
 #include "Omega_h_math.hpp"
 
-int main(int argc, char* argv[])
+Omega_h::Mesh read_vol_mesh(Omega_h::Library const& lib, const char* vol_filename)
 {
   double dummy;
   std::string line;
   std::fstream inmesh;
   int nv;
 
-  auto lib = Omega_h::Library(&argc, &argv);
-
-  //opening netgen mesh file
-  OMEGA_H_CHECK(argc == 4);
-  inmesh.open(argv[1], std::ios::in);
+  inmesh.open(vol_filename, std::ios::in);
   while(true)
   {
     getline(inmesh,line);
@@ -131,18 +127,18 @@ int main(int argc, char* argv[])
   for (int i = 0; i < mesh.nverts(); ++i) {
     Omega_h::I8 vcd = 2; /* initialize dimension to 2D */
     Omega_h::I32 vci = -1;
-    /* for each edge touch (ve) */
+    /* for each edge touch (ve) on this vertex */
     for (auto ve = v2ve[i]; ve < v2ve[i + 1]; ++ve) {
       auto e = ve2e[ve]; /* get the touching edge */
       auto ecd = edge_class_dim[e]; /* its classification */
       if (ecd == 2) continue; /* interior edge */
       auto eci = edge_class_id[e]; /* class_id of edge */
-      if (vcd == 2) { /* though vertex was interior, but it touches boundary */
+      if (vcd == 2) { /* touches first geometric edge */
         vcd = 1;
         vci = eci;
         continue;
       }
-      /* touches two geometric edges: geometric vertex */
+      /* touches second geometric edge, becomes geometric vertex */
       if (vcd == 1 && eci != vci) {
         vcd = 0;
         vci = i + 1;
@@ -159,14 +155,18 @@ int main(int argc, char* argv[])
   mesh.add_tag(Omega_h::VERT, "class_id", 1, OMEGA_H_INHERIT,
       OMEGA_H_DO_OUTPUT, vert_class_id);
 /* end classification work */
+  return mesh;
+}
 
+void read_and_attach_metric(Omega_h::Mesh* mesh, const char* metric_filename)
+{
   /* reading in the anisotropy data*/
   std::fstream inmetric;
-  inmetric.open(argv[3], std::ios::in);
+  inmetric.open(metric_filename, std::ios::in);
   int nv_metric, dim;
   inmetric >> nv_metric >> dim;
   /* Check to make sure the number of data poitns in the anisotropy informaiton is the same as the number of nodes*/
-  if(nv_metric!=nv || dim!=3)
+  if(nv_metric!=mesh->nverts() || dim!=3)
   {
     std::cout<<"Metric data does not correspond to the given mesh!"<<std::endl;
     exit(1);
@@ -184,8 +184,8 @@ int main(int argc, char* argv[])
   /* Anisotropy information read from file */
 
   /* attach the metric to the Omega_h mesh, as "target_metric" */
-  Omega_h::Write<Omega_h::Real> metric_w(nv * 3);
-  for (int i = 0; i < nv; ++i) {
+  Omega_h::Write<Omega_h::Real> metric_w(mesh->nverts() * 3);
+  for (int i = 0; i < mesh->nverts(); ++i) {
     Omega_h::Matrix<2, 2> m;
     m[0][0] = aa[i];
     m[0][1] = m[1][0] = bb[i];
@@ -193,18 +193,34 @@ int main(int argc, char* argv[])
     Omega_h::set_symm(metric_w, i, m);
   }
   Omega_h::Reals metric(metric_w);
-  mesh.add_tag(Omega_h::VERT, "target_metric", 3, OMEGA_H_METRIC,
+  mesh->add_tag(Omega_h::VERT, "target_metric", 3, OMEGA_H_METRIC,
       OMEGA_H_DO_OUTPUT, metric);
+}
 
-  /* write the converted mesh to VTK file */
-  Omega_h::vtk::write_vtu(argv[2], &mesh, 2);
+int main(int argc, char* argv[])
+{
+  auto lib = Omega_h::Library(&argc, &argv);
+
+  OMEGA_H_CHECK(argc == 3 || argc == 4);
+
+  auto mesh = read_vol_mesh(lib, argv[1]);
+
+  read_and_attach_metric(&mesh, argv[2]);
 
   /* Find the "identity" metric: the one that keeps the mesh the same */
   auto id_metric = find_identity_metric(&mesh);
   mesh.add_tag(Omega_h::VERT, "metric", 3, OMEGA_H_METRIC,
       OMEGA_H_DO_OUTPUT, id_metric);
+  /* Make sure initial qualities and lengths are attached */
+  mesh.ask_qualities();
+  mesh.ask_lengths();
+
 /* Adapt the mesh ! */
-  Omega_h::vtk::FullWriter writer(&mesh, "adapting");
+  Omega_h::vtk::FullWriter* writer;
+  if (argc == 4) {
+    writer = new Omega_h::vtk::FullWriter(&mesh, argv[3]);
+    writer->write();
+  }
   /* move metric closer to target until element quality below 30%: */
   while (approach_metric(&mesh, 0.30)) {
     adapt(&mesh,
@@ -214,6 +230,7 @@ int main(int argc, char* argv[])
         1.0 / 1.0, /* desired max metric length */
         4, /* number of sliver layers */
         3); /* verbosity level */
-    writer.write(); /* output VTK file */
+    if (argc == 4) writer->write(); /* output VTK file */
   }
+  delete writer;
 }
