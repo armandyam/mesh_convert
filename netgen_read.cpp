@@ -219,6 +219,7 @@ void write_vol_mesh(Omega_h::Mesh* mesh, const char* vol_filename) {
   auto tv2v = mesh->ask_verts_of(Omega_h::TRI);
   auto w8 = std::setw(8);
   auto w12 = std::setw(12);
+  auto w24 = std::setw(24);
   for (int i = 0; i < mesh->ntris(); ++i) {
     file << w8 << 2 << w8 << 1 << w8 << 0 << w8 << 0 << w8 << 3;
     for (int j = 0; j < 3; ++j)
@@ -238,6 +239,7 @@ void write_vol_mesh(Omega_h::Mesh* mesh, const char* vol_filename) {
   file << "# surfid       0      p1      p2";
   file << "    tri1    tri2 surfnr1 surfnr2";
   file << "   ednr1       dist1   ednr2       dist2\n";
+  file << "edgesegmentsgi2\n";
   file << nsurfe << '\n';
   for (int i = 0; i < mesh->nedges(); ++i) {
     if (e_class_dim[i] != 1) continue;
@@ -254,6 +256,21 @@ void write_vol_mesh(Omega_h::Mesh* mesh, const char* vol_filename) {
     }
     file << '\n';
   }
+  file << "\n\n#";
+  for (int i = 0; i < 22; ++i) file << ' '; file << 'X';
+  for (int i = 0; i < 23; ++i) file << ' '; file << 'Y';
+  for (int i = 0; i < 23; ++i) file << ' '; file << 'Z';
+  file << "\npoints\n" << mesh->nverts() << '\n';
+  auto oldprecision = file.precision();
+  file.precision(15);
+  file << std::fixed;
+  for (int i = 0; i < mesh->nverts(); ++i) {
+    auto x = Omega_h::get_vector<2>(coords, i);
+    double z = 0.0;
+    file << w24 << x[0] << w24 << x[1] << w24 << z << '\n';
+  }
+  file.precision(oldprecision);
+  file << std::defaultfloat;
 }
 
 int main(int argc, char* argv[])
