@@ -4,8 +4,11 @@ Adapting meshes to generate anisotropic elements
 ## Usage
 
 ```shell
-./mesh_read netgen.vol metric_file.mtr [adapting]
+./mesh_read netgen.vol metric_file.mtr adapted.vol [adapting]
 ```
+
+The input mesh and metric are specified first;
+the third argument is the file to write the adapted mesh to.
 
 If the last optional argument is specified as
 "adapting", the directory `adapting` contains a visualization

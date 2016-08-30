@@ -1,4 +1,5 @@
 #include<iostream>
+#include<iomanip>
 #include<fstream>
 #include<sstream>
 #include<vector>
@@ -197,11 +198,29 @@ void read_and_attach_metric(Omega_h::Mesh* mesh, const char* metric_filename)
       OMEGA_H_DO_OUTPUT, metric);
 }
 
+void write_vol_mesh(Omega_h::Mesh* mesh, const char* vol_filename) {
+  std::ofstream file(vol_filename);
+  file << "mesh3d\ndimension\n2\ngeomtype\n0\n\n";
+  file << "# surfnr    bcnr   domin  domout      np      p1      p2      p3\n";
+  file << "surfaceelements\n" << mesh->nelems() << '\n';
+  auto oldwidth = file.width();
+  file.width(8);
+  auto tv2v = mesh->ask_verts_of(Omega_h::TRI);
+  auto w8 = std::setw(8);
+  for (int i = 0; i < mesh->ntris(); ++i) {
+    file << w8 << 2 << w8 << 1 << w8 << 0 << w8 << 0 << w8 << 3;
+    for (int j = 0; j < 3; ++j)
+      file << w8 << tv2v[i * 3 + j];
+    file << '\n';
+  }
+  file.width(oldwidth);
+}
+
 int main(int argc, char* argv[])
 {
   auto lib = Omega_h::Library(&argc, &argv);
 
-  OMEGA_H_CHECK(argc == 3 || argc == 4);
+  OMEGA_H_CHECK(argc == 4 || argc == 5);
 
   auto mesh = read_vol_mesh(lib, argv[1]);
 
@@ -216,9 +235,9 @@ int main(int argc, char* argv[])
   mesh.ask_lengths();
 
 /* Adapt the mesh ! */
-  Omega_h::vtk::FullWriter* writer;
-  if (argc == 4) {
-    writer = new Omega_h::vtk::FullWriter(&mesh, argv[3]);
+  Omega_h::vtk::FullWriter* writer = nullptr;
+  if (argc == 5) {
+    writer = new Omega_h::vtk::FullWriter(&mesh, argv[4]);
     writer->write();
   }
   /* move metric closer to target until element quality below 30%: */
@@ -230,7 +249,9 @@ int main(int argc, char* argv[])
         1.0 / 1.0, /* desired max metric length */
         4, /* number of sliver layers */
         3); /* verbosity level */
-    if (argc == 4) writer->write(); /* output VTK file */
+    if (argc == 5) writer->write(); /* output VTK file */
   }
   delete writer;
+
+  write_vol_mesh(&mesh, argv[3]);
 }
