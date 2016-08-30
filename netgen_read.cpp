@@ -271,6 +271,17 @@ void write_vol_mesh(Omega_h::Mesh* mesh, const char* vol_filename) {
   }
   file.precision(oldprecision);
   file << std::defaultfloat;
+  file << "materials\n1\n1 domain1\n\n\n";
+  file << "# Surfnr";
+  file << "          Red";
+  file << "        Green";
+  file << "         Blue";
+  file << "\nface_colours\n1\n";
+  file << "       1";
+  file << "   0.00000000";
+  file << "   1.00000000";
+  file << "   0.00000000";
+  file << "\n\n\nendmesh\n\n";
 }
 
 int main(int argc, char* argv[])
