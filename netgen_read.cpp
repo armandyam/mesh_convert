@@ -314,8 +314,8 @@ int main(int argc, char* argv[])
     adapt(&mesh,
         0.30, /* min allowable quality during adapt */
         0.40, /* desired min quality */
-        1.0 / 2.0, /* desired min metric length */
-        1.0 / 1.0, /* desired max metric length */
+        2.0 / 3.0, /* desired min metric length */
+        4.0 / 3.0, /* desired max metric length */
         4, /* number of sliver layers */
         3); /* verbosity level */
     if (argc == 5) writer->write(); /* output VTK file */
