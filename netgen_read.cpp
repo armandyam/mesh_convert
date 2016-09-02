@@ -309,15 +309,21 @@ int main(int argc, char* argv[])
     writer->write();
   }
   /* move metric closer to target until element quality below 30%: */
+  int n = 0;
   while (approach_metric(&mesh, 0.30)) {
     adapt(&mesh,
         0.30, /* min allowable quality during adapt */
         0.40, /* desired min quality */
-        1.0 / 2.0, /* desired min metric length */
-        1.0 / 1.0, /* desired max metric length */
+        2.0 / 3.0, /* desired min metric length */
+        4.0 / 3.0, /* desired max metric length */
         4, /* number of sliver layers */
         3); /* verbosity level */
     if (argc == 5) writer->write(); /* output VTK file */
+    ++n;
+    if (n == 100) {
+      std::cerr << "aborting due to 100 approach iterations!\n";
+      break;
+    }
   }
   delete writer;
 
