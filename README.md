@@ -4,7 +4,7 @@ Adapting meshes to generate anisotropic elements
 ## Usage
 
 ```shell
-./mesh_read netgen.vol metric_file.mtr adapted.vol [adapting]
+./omega_h netgen.vol metric_file.mtr adapted.vol [adapting]
 ```
 
 The input mesh and metric are specified first;
