@@ -1,10 +1,11 @@
-#include<iostream>
-#include<iomanip>
-#include<fstream>
-#include<sstream>
-#include<vector>
-#include<math.h>
-#include<assert.h>
+#include <iostream>
+#include <iomanip>
+#include <fstream>
+#include <sstream>
+#include <vector>
+#include <cmath>
+#include <cassert>
+#include <cstring>
 
 #include "Omega_h.hpp"
 #include "Omega_h_math.hpp"
@@ -288,11 +289,48 @@ int main(int argc, char* argv[])
 {
   auto lib = Omega_h::Library(&argc, &argv);
 
-  OMEGA_H_CHECK(argc == 4 || argc == 5);
+  const char* input_vol_file = nullptr;
+  const char* metric_file = nullptr;
+  const char* output_vol_file = nullptr;
+  const char* adapt_log_dir = nullptr;
+  const char* axes_file = nullptr;
 
-  auto mesh = read_vol_mesh(lib, argv[1]);
+  for (int i = 1; i < argc; ++i) {
+    if (!strcmp("--adapt_log", argv[i])) {
+      if (i == argc - 1) {
+        std::cout << "--adapt_log takes an argument\n";
+        return -1;
+      }
+      adapt_log_dir = argv[++i];
+    } else if (!strcmp("--axes", argv[i])) {
+      if (i == argc - 1) {
+        std::cout << "--axes takes an argument\n";
+        return -1;
+      }
+      axes_file = argv[++i];
+      std::cout << "axes file " << axes_file << '\n';
+    } else if (!input_vol_file) {
+      input_vol_file = argv[i];
+      std::cout << "input vol file " << input_vol_file << '\n';
+    } else if (!metric_file) {
+      metric_file = argv[i];
+      std::cout << "metric file " << metric_file << '\n';
+    } else if (!output_vol_file) {
+      output_vol_file = argv[i];
+      std::cout << "output vol file " << output_vol_file << '\n';
+    } else {
+      std::cout << "unexpected argument " << argv[i] << '\n';
+      return -1;
+    }
+  }
+  if (!input_vol_file || !metric_file || !output_vol_file) {
+    std::cout << "need to specify input .vol file, .mtr file, and output .vol file\n";
+    return -1;
+  }
 
-  read_and_attach_metric(&mesh, argv[2]);
+  auto mesh = read_vol_mesh(lib, input_vol_file);
+
+  read_and_attach_metric(&mesh, metric_file);
 
   /* Find the "identity" metric: the one that keeps the mesh the same */
   auto id_metric = find_identity_metric(&mesh);
@@ -302,24 +340,35 @@ int main(int argc, char* argv[])
   mesh.ask_qualities();
   mesh.ask_lengths();
 
+  if (axes_file) {
+    Omega_h::axes_from_metric_field(&mesh, "target_metric", "axis");
+    Omega_h::vtk::write_vtu(axes_file, &mesh, 2);
+  }
+
 /* Adapt the mesh ! */
   Omega_h::vtk::FullWriter* writer = nullptr;
-  if (argc == 5) {
-    writer = new Omega_h::vtk::FullWriter(&mesh, argv[4]);
+  if (adapt_log_dir) {
+    writer = new Omega_h::vtk::FullWriter(&mesh, adapt_log_dir);
     writer->write();
   }
   /* move metric closer to target until element quality below 30%: */
+  int n = 0;
   while (approach_metric(&mesh, 0.30)) {
     adapt(&mesh,
-        0.30, /* min allowable quality during adapt */
+        0.10, /* min allowable quality during adapt */
         0.40, /* desired min quality */
         1.0 / 2.0, /* desired min metric length */
         1.0 / 1.0, /* desired max metric length */
         4, /* number of sliver layers */
         3); /* verbosity level */
-    if (argc == 5) writer->write(); /* output VTK file */
+    if (adapt_log_dir) writer->write(); /* output VTK file */
+    ++n;
+    if (n == 100) {
+      std::cerr << "aborting due to 100 approach iterations!\n";
+      break;
+    }
   }
   delete writer;
 
-  write_vol_mesh(&mesh, argv[3]);
+  write_vol_mesh(&mesh, output_vol_file);
 }
