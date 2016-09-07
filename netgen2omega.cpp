@@ -294,6 +294,8 @@ int main(int argc, char* argv[])
   const char* output_vol_file = nullptr;
   const char* adapt_log_dir = nullptr;
   const char* axes_file = nullptr;
+  bool should_limit = false;
+  double max_rate = 0;
 
   for (int i = 1; i < argc; ++i) {
     if (!strcmp("--adapt_log", argv[i])) {
@@ -309,6 +311,13 @@ int main(int argc, char* argv[])
       }
       axes_file = argv[++i];
       std::cout << "axes file " << axes_file << '\n';
+    } else if (!strcmp("--limit", argv[i])) {
+      if (i == argc - 1) {
+        std::cout << "--limit takes an argument\n";
+        return -1;
+      }
+      should_limit = true;
+      max_rate = atof(argv[++i]);
     } else if (!input_vol_file) {
       input_vol_file = argv[i];
       std::cout << "input vol file " << input_vol_file << '\n';
@@ -340,7 +349,18 @@ int main(int argc, char* argv[])
   mesh.ask_qualities();
   mesh.ask_lengths();
 
+  if (should_limit) {
+    auto target = mesh.get_array<double>(Omega_h::VERT, "target_metric");
+    mesh.add_tag(Omega_h::VERT, "original_metric", 3,
+        OMEGA_H_DONT_TRANSFER, OMEGA_H_DO_OUTPUT, target);
+    auto limited = Omega_h::limit_metrics_by_adj(&mesh, target, max_rate);
+    mesh.set_tag(Omega_h::VERT, "target_metric", limited);
+  }
+
   if (axes_file) {
+    if (should_limit) {
+      Omega_h::axes_from_metric_field(&mesh, "original_metric", "original_axis");
+    }
     Omega_h::axes_from_metric_field(&mesh, "target_metric", "axis");
     Omega_h::vtk::write_vtu(axes_file, &mesh, 2);
   }

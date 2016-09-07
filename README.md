@@ -4,7 +4,11 @@ Adapting meshes to generate anisotropic elements
 ## Usage
 
 ```shell
-./omega_h --adapt_log adapting --axes axes.vtu netgen.vol metric_file.mtr adapted.vol
+./omega_h netgen.vol metric_file.mtr adapted.vol
+Options:
+  --adapt_log <vtk_output_directory>
+  --axes <output.vtu>
+  --limit <scalar (1.0 good default)>
 ```
 
 The input mesh and metric are specified first;
@@ -26,3 +30,11 @@ If the optional `--axes` argument is specified as `axes.vtu`,
 that file will be created with vector fields `axis_0` and
 `axis_1` that can be given to a Paraview Glyph filter to render
 major and minor axes of the metric field.
+
+If the optional `--limit` argument is specified with value 1.0,
+the rate of change of the metric *over metric distance* will
+be limited to this rate.
+This is useful if you have a few problematic metric values which
+are requesting elements larger than can possibly be satisfied.
+Desired lengths will be reduced (never increased) as necessary
+to limit the metric field to something more satisfiable.
