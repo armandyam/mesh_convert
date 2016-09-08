@@ -381,7 +381,7 @@ int main(int argc, char* argv[])
   int n = 0;
   while (approach_metric(&mesh, 0.30)) {
     adapt(&mesh,
-        0.10, /* min allowable quality during adapt */
+        0.30, /* min allowable quality during adapt */
         0.40, /* desired min quality */
         2.0 / 3.0, /* desired min metric length */
         4.0 / 3.0, /* desired max metric length */
