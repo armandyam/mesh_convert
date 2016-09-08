@@ -349,12 +349,18 @@ int main(int argc, char* argv[])
   mesh.ask_qualities();
   mesh.ask_lengths();
 
+  auto target = mesh.get_array<double>(Omega_h::VERT, "target_metric");
+  auto elems_per_elem = Omega_h::expected_elems_per_elem_metric(&mesh, target);
+  auto target_nelems = Omega_h::repro_sum(elems_per_elem);
+  std::cerr << "input metric would produce about " << target_nelems << " elements\n";
   if (should_limit) {
-    auto target = mesh.get_array<double>(Omega_h::VERT, "target_metric");
     mesh.add_tag(Omega_h::VERT, "original_metric", 3,
         OMEGA_H_DONT_TRANSFER, OMEGA_H_DO_OUTPUT, target);
     auto limited = Omega_h::limit_metrics_by_adj(&mesh, target, max_rate);
     mesh.set_tag(Omega_h::VERT, "target_metric", limited);
+    elems_per_elem = Omega_h::expected_elems_per_elem_metric(&mesh, limited);
+    target_nelems = Omega_h::repro_sum(elems_per_elem);
+    std::cerr << "limited metric would produce about " << target_nelems << " elements\n";
   }
 
   if (axes_file) {
@@ -377,8 +383,8 @@ int main(int argc, char* argv[])
     adapt(&mesh,
         0.10, /* min allowable quality during adapt */
         0.40, /* desired min quality */
-        1.0 / 2.0, /* desired min metric length */
-        1.0 / 1.0, /* desired max metric length */
+        2.0 / 3.0, /* desired min metric length */
+        4.0 / 3.0, /* desired max metric length */
         4, /* number of sliver layers */
         3); /* verbosity level */
     if (adapt_log_dir) writer->write(); /* output VTK file */
