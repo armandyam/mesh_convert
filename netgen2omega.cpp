@@ -165,6 +165,10 @@ void read_and_attach_metric(Omega_h::Mesh* mesh, const char* metric_filename)
   /* reading in the anisotropy data*/
   std::fstream inmetric;
   inmetric.open(metric_filename, std::ios::in);
+  if (!inmetric.is_open()) {
+    std::cout << "could not open " << metric_filename << '\n';
+    exit(-1);
+  }
   int nv_metric, dim;
   inmetric >> nv_metric >> dim;
   /* Check to make sure the number of data poitns in the anisotropy informaiton is the same as the number of nodes*/
