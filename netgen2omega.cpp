@@ -345,8 +345,8 @@ int main(int argc, char* argv[])
 
   read_and_attach_metric(&mesh, metric_file);
 
-  /* Find the "identity" metric: the one that keeps the mesh the same */
-  auto id_metric = find_identity_metric(&mesh);
+  /* Find the "implied" metric: the one that keeps the mesh the same */
+  auto id_metric = find_implied_metric(&mesh);
   mesh.add_tag(Omega_h::VERT, "metric", 3, OMEGA_H_METRIC,
       OMEGA_H_DO_OUTPUT, id_metric);
   /* Make sure initial qualities and lengths are attached */
@@ -381,16 +381,13 @@ int main(int argc, char* argv[])
     writer = new Omega_h::vtk::FullWriter(&mesh, adapt_log_dir);
     writer->write();
   }
+  Omega_h::AdaptOpts opts;
+  opts.min_quality_allowed = 0.20;
+  opts.min_quality_desired = 0.40;
   /* move metric closer to target until element quality below 30%: */
   int n = 0;
-  while (approach_metric(&mesh, 0.30)) {
-    adapt(&mesh,
-        0.30, /* min allowable quality during adapt */
-        0.40, /* desired min quality */
-        2.0 / 3.0, /* desired min metric length */
-        4.0 / 3.0, /* desired max metric length */
-        4, /* number of sliver layers */
-        3); /* verbosity level */
+  while (Omega_h::approach_size_field(&mesh, opts)) {
+    Omega_h::adapt(&mesh, opts);
     if (adapt_log_dir) writer->write(); /* output VTK file */
     ++n;
     if (n == 100) {
