@@ -299,7 +299,9 @@ int main(int argc, char* argv[])
   const char* adapt_log_dir = nullptr;
   const char* axes_file = nullptr;
   bool should_limit = false;
-  double max_rate = 0;
+  double gradation_rate = 0.0;
+  bool should_smooth = false;
+  int nsmooth_iters = 0;
 
   for (int i = 1; i < argc; ++i) {
     if (!strcmp("--adapt_log", argv[i])) {
@@ -321,7 +323,14 @@ int main(int argc, char* argv[])
         return -1;
       }
       should_limit = true;
-      max_rate = atof(argv[++i]);
+      gradation_rate = atof(argv[++i]);
+    } else if (!strcmp("--smooth", argv[i])) {
+      if (i == argc - 1) {
+        std::cout << "--smooth takes an argument\n";
+        return -1;
+      }
+      should_smooth = true;
+      nsmooth_iters = atoi(argv[++i]);
     } else if (!input_vol_file) {
       input_vol_file = argv[i];
       std::cout << "input vol file " << input_vol_file << '\n';
@@ -346,30 +355,50 @@ int main(int argc, char* argv[])
   read_and_attach_metric(&mesh, metric_file);
 
   /* Find the "implied" metric: the one that keeps the mesh the same */
-  auto id_metric = find_implied_metric(&mesh);
+  auto implied_metric = find_implied_metric(&mesh);
   mesh.add_tag(Omega_h::VERT, "metric", 3, OMEGA_H_METRIC,
-      OMEGA_H_DO_OUTPUT, id_metric);
+      OMEGA_H_DO_OUTPUT, implied_metric);
   /* Make sure initial qualities and lengths are attached */
   mesh.ask_qualities();
   mesh.ask_lengths();
 
   auto target = mesh.get_array<double>(Omega_h::VERT, "target_metric");
-  auto elems_per_elem = Omega_h::expected_elems_per_elem_metric(&mesh, target);
-  auto target_nelems = Omega_h::repro_sum(elems_per_elem);
-  std::cerr << "input metric would produce about " << target_nelems << " elements\n";
-  if (should_limit) {
+
+  if (should_smooth || should_limit) {
+    auto elems_per_elem = Omega_h::expected_elems_per_elem_metric(&mesh, target);
+    auto target_nelems = Omega_h::repro_sum(elems_per_elem);
+    std::cout << "original metric would produce about " << target_nelems << " elements\n";
     mesh.add_tag(Omega_h::VERT, "original_metric", 3,
         OMEGA_H_DONT_TRANSFER, OMEGA_H_DO_OUTPUT, target);
-    auto limited = Omega_h::limit_metrics_by_adj(&mesh, target, max_rate);
-    mesh.set_tag(Omega_h::VERT, "target_metric", limited);
-    elems_per_elem = Omega_h::expected_elems_per_elem_metric(&mesh, limited);
-    target_nelems = Omega_h::repro_sum(elems_per_elem);
-    std::cerr << "limited metric would produce about " << target_nelems << " elements\n";
   }
 
+  if (should_smooth) {
+    for (int i = 0; i < nsmooth_iters; ++i) {
+      target = Omega_h::smooth_metric_once(&mesh, target);
+    }
+  }
+
+  if (should_smooth && should_limit) {
+    mesh.add_tag(Omega_h::VERT, "smoothed_metric", 3,
+        OMEGA_H_DONT_TRANSFER, OMEGA_H_DO_OUTPUT, target);
+  }
+
+  if (should_limit) {
+    target = Omega_h::limit_metric_gradation(&mesh, target, gradation_rate);
+  }
+
+  mesh.set_tag(Omega_h::VERT, "target_metric", target);
+
+  auto elems_per_elem = Omega_h::expected_elems_per_elem_metric(&mesh, target);
+  auto target_nelems = Omega_h::repro_sum(elems_per_elem);
+  std::cerr << "target metric would produce about " << target_nelems << " elements\n";
+
   if (axes_file) {
-    if (should_limit) {
+    if (should_smooth || should_limit) {
       Omega_h::axes_from_metric_field(&mesh, "original_metric", "original_axis");
+    }
+    if (should_smooth && should_limit) {
+      Omega_h::axes_from_metric_field(&mesh, "smoothed_metric", "smoothed_axis");
     }
     Omega_h::axes_from_metric_field(&mesh, "target_metric", "axis");
     Omega_h::vtk::write_vtu(axes_file, &mesh, 2);
@@ -381,11 +410,9 @@ int main(int argc, char* argv[])
     writer = new Omega_h::vtk::FullWriter(&mesh, adapt_log_dir);
     writer->write();
   }
-  Omega_h::AdaptOpts opts;
-  opts.min_quality_allowed = 0.20;
-  opts.min_quality_desired = 0.40;
-  /* move metric closer to target until element quality below 30%: */
+  Omega_h::AdaptOpts opts(&mesh);
   int n = 0;
+  /* move metric closer to target until element quality too low */
   while (Omega_h::approach_size_field(&mesh, opts)) {
     Omega_h::adapt(&mesh, opts);
     if (adapt_log_dir) writer->write(); /* output VTK file */
