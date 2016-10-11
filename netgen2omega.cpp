@@ -10,7 +10,7 @@
 #include "Omega_h.hpp"
 #include "Omega_h_math.hpp"
 
-Omega_h::Mesh read_vol_mesh(Omega_h::Library const& lib, const char* vol_filename)
+Omega_h::Mesh read_vol_mesh(Omega_h::Library* lib, const char* vol_filename)
 {
   double dummy;
   std::string line;
@@ -72,8 +72,8 @@ Omega_h::Mesh read_vol_mesh(Omega_h::Library const& lib, const char* vol_filenam
       coords_w[i * 2 + j] = mpoints[i][j];
   auto coords = Omega_h::Reals(coords_w);
   /* build the basic mesh from triangle connectivity and coordinates */
-  Omega_h::Mesh mesh;
-  Omega_h::build_from_elems_and_coords(&mesh, lib, 2, tv2v, coords);
+  Omega_h::Mesh mesh(lib);
+  Omega_h::build_from_elems_and_coords(&mesh, 2, tv2v, coords);
 /* begin classification work */
   /* do a simple classification of triangles: all to interior #1 */
   mesh.add_tag(Omega_h::TRI, "class_dim", 1, OMEGA_H_INHERIT,
@@ -350,7 +350,7 @@ int main(int argc, char* argv[])
     return -1;
   }
 
-  auto mesh = read_vol_mesh(lib, input_vol_file);
+  auto mesh = read_vol_mesh(&lib, input_vol_file);
 
   read_and_attach_metric(&mesh, metric_file);
 
